@@ -93,6 +93,19 @@ geef_index_read_tree(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 }
 
 ERL_NIF_TERM
+geef_index_nth(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
+{
+	geef_index *index;
+	unsigned int n;
+
+	if (!enif_get_resource(env, argv[0], geef_index_type, (void **) &index))
+		return enif_make_badarg(env);
+
+	if (!enif_get_uint(env, argv[1], &n))
+		return enif_make_badarg(env);
+}
+
+ERL_NIF_TERM
 geef_index_clear(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
 	geef_index *index;
