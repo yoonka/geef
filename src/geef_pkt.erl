@@ -18,10 +18,11 @@ line(Text) ->
 -spec parse(iolist()) -> {{want | have, geef_oid()}, binary()} | {error, ebufs}.
 parse(In) ->
     case unpack(In) of
-	Err = {error, ebufs} ->
-	    Err;
-	{Len, Rest} ->
-	    parse_pkt(Rest, Len)
+	{error, ebufs} ->
+	    {continue, fun(More) -> parse([In, More]) end};
+	{Len, Bin} ->
+	    {Pkt, Rest} = parse_pkt(Bin, Len),
+	    {Pkt, fun(More) -> parse([Rest, More]) end}
     end.
 
 -spec parse_request(iolist()) -> geef_request().
