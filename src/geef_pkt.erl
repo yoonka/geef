@@ -28,8 +28,8 @@ parse(In) ->
 -spec parse_request(iolist()) -> geef_request().
 parse_request(In) ->
     case unpack(In) of
-	Err = {error, ebufs} ->
-	    Err;
+	{error, ebufs} ->
+	    {continue, fun(More) -> parse_request([In, More]) end};
 	{_, Line} ->
 	    %% Split it into request, host, rest (should be empty)
 	    [S, H, _] = binary:split(Line, <<0:8>>, [global]),

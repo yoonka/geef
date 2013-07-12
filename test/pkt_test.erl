@@ -39,6 +39,9 @@ short_test() ->
 
 short_request_test() ->
     Line = <<"0039git-upload">>,
-    Expected = {error, ebufs},
-    Actual = geef_pkt:parse_request(Line),
-    ?assertEqual(Expected, Actual).
+    Actual1 = geef_pkt:parse_request(Line),
+    ?assertMatch({continue, _}, Actual1),
+    {_, Cont} = Actual1,
+    {ok, Actual2} = Cont(<<"-pack /schacon/gitbook.git\0host=example.com\0">>),
+    Expected = #geef_request{service=upload_pack, path= <<"/schacon/gitbook.git">>, host= <<"example.com">>},
+    ?assertEqual(Expected, Actual2).
