@@ -40,14 +40,70 @@ on_error:
 	return geef_oom(env);
 }
 
+static ERL_NIF_TERM create_ref(ErlNifEnv *env, git_reference *ref)
+{
+	const char *name;
+	ErlNifBinary name_bin, target_bin;
+	size_t len;
+	ERL_NIF_TERM type;
+
+	/* Figure out the type */
+	switch (git_reference_type(ref)) {
+	case GIT_REF_OID:
+		type = atoms.oid;
+		break;
+	case GIT_REF_SYMBOLIC:
+		type = atoms.symbolic;
+		break;
+	default:
+		type = atoms.error;
+		break;
+	}
+
+	if (type == atoms.error)
+		return atoms.error;
+
+	if (git_reference_type(ref) == GIT_REF_OID) {
+		const git_oid *id;
+		id = git_reference_target(ref);
+
+		if (geef_oid_bin(&target_bin, id) < 0)
+			return geef_oom(env);
+	} else {
+		const char *name;
+		size_t len;
+
+		name = git_reference_symbolic_target(ref);
+		len = strlen(name);
+
+		if (enif_alloc_binary(len, &target_bin) < 0)
+			return geef_oom(env);
+
+		memcpy(target_bin.data, name, len);
+	}
+
+	/* Store the name */
+	name = git_reference_name(ref);
+	len = strlen(name);
+
+	if (enif_alloc_binary(len, &name_bin) < 0)
+		return geef_oom(env);
+
+	memcpy(name_bin.data, name, len);
+
+	return enif_make_tuple2(env, atoms.ok, enif_make_tuple3(env,
+				enif_make_binary(env, &name_bin),
+				type,
+				enif_make_binary(env, &target_bin)));
+
+}
+
 ERL_NIF_TERM
 geef_reference_lookup(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
 	geef_repository *repo;
-	geef_ref *res_ref;
 	git_reference *ref;
 	ErlNifBinary bin;
-	ERL_NIF_TERM term_ref;
 	int error;
 
 	if (!enif_get_resource(env, argv[0], geef_repository_type, (void **) &repo))
@@ -65,33 +121,33 @@ geef_reference_lookup(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 	if (error < 0)
 		return geef_error(env);
 
-	res_ref = enif_alloc_resource(geef_ref_type, sizeof(geef_ref));
-	res_ref->ref = ref;
-	term_ref = enif_make_resource(env, res_ref);
-	enif_release_resource(res_ref);
-
-	return enif_make_tuple2(env, atoms.ok, term_ref);
+	return create_ref(env, ref);
 }
 
 ERL_NIF_TERM
-geef_reference_resolve(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
+geef_reference_lookup_resolved(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
 	geef_ref *in_ref, *res_ref;
 	ERL_NIF_TERM term_ref;
 	git_reference *ref;
+	git_repository *repo;
+	ErlNifBinary bin;
 
-	if (!enif_get_resource(env, argv[0], geef_ref_type, (void **) &in_ref))
+	if (!enif_get_resource(env, argv[0], geef_repository_type, (void **) &repo))
 		return enif_make_badarg(env);
 
-	if (git_reference_resolve(&ref, in_ref->ref) < 0)
+	if (!enif_inspect_iolist_as_binary(env, argv[1], &bin))
+		return enif_make_badarg(env);
+
+	if (!geef_terminate_binary(&bin))
+		return geef_oom(env);
+
+	if (git_reference_lookup_resolved(&ref, repo, (char *)bin.data))
 		return geef_error(env);
 
-	res_ref = enif_alloc_resource(geef_ref_type, sizeof(geef_ref));
-	res_ref->ref = ref;
-	term_ref = enif_make_resource(env, res_ref);
-	enif_release_resource(res_ref);
+	enif_release_binary(&bin);
 
-	return enif_make_tuple2(env, atoms.ok, term_ref);
+	return create_ref(env, ref);
 }
 
 ERL_NIF_TERM
@@ -178,37 +234,6 @@ geef_reference_glob(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 }
 
 ERL_NIF_TERM
-geef_reference_target(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
-{
-	geef_ref *ref;
-	ErlNifBinary bin;
-
-	if (!enif_get_resource(env, argv[0], geef_ref_type, (void **) &ref))
-		return enif_make_badarg(env);
-
-	if (git_reference_type(ref->ref) == GIT_REF_OID) {
-		const git_oid *id;
-		id = git_reference_target(ref->ref);
-
-		if (geef_oid_bin(&bin, id) < 0)
-			return geef_oom(env);
-	} else {
-		const char *name;
-		size_t len;
-
-		name = git_reference_symbolic_target(ref->ref);
-		len = strlen(name);
-
-		if (enif_alloc_binary(len, &bin) < 0)
-			return geef_oom(env);
-
-		memcpy(bin.data, name, len + 1);
-	}
-
-	return enif_make_binary(env, &bin);
-}
-
-ERL_NIF_TERM
 geef_reference_to_id(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
 	geef_repository *repo;
@@ -229,55 +254,6 @@ geef_reference_to_id(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
 	if (geef_oid_bin(&bin, &id) < 0)
 		return geef_oom(env);
-
-	return enif_make_tuple2(env, atoms.ok, enif_make_binary(env, &bin));
-}
-
-ERL_NIF_TERM
-geef_reference_type(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
-{
-	geef_ref *ref;
-	int type;
-	ERL_NIF_TERM term_type;
-
-	if (!enif_get_resource(env, argv[0], geef_ref_type, (void **) &ref))
-		return enif_make_badarg(env);
-
-	type = git_reference_type(ref->ref);
-
-	switch (type) {
-	case GIT_REF_OID:
-		term_type = atoms.oid;
-		break;
-	case GIT_REF_SYMBOLIC:
-		term_type = atoms.symbolic;
-		break;
-	default:
-		term_type = atoms.error;
-		break;
-	}
-
-	return term_type;
-}
-
-ERL_NIF_TERM
-geef_reference_name(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
-{
-	geef_ref *ref;
-	const char *name;
-	ErlNifBinary bin;
-	size_t len;
-
-	if (!enif_get_resource(env, argv[0], geef_ref_type, (void **) &ref))
-		return enif_make_badarg(env);
-
-	name = git_reference_name(ref->ref);
-	len = strlen(name);
-
-	if (enif_alloc_binary(len, &bin) < 0)
-		return geef_oom(env);
-
-	memcpy(bin.data, name, len + 1);
 
 	return enif_make_tuple2(env, atoms.ok, enif_make_binary(env, &bin));
 }
@@ -330,9 +306,5 @@ geef_reference_create(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 	if (error < 0)
 		return geef_error(env);
 
-	term_ref = enif_make_resource(env, ref);
-	enif_release_resource(ref);
-
-	return enif_make_tuple2(env, atoms.ok, term_ref);
-
+	return create_ref(env, ref);
 }

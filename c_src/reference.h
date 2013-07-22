@@ -14,10 +14,7 @@ ERL_NIF_TERM geef_reference_list(ErlNifEnv *env, int argc, const ERL_NIF_TERM ar
 ERL_NIF_TERM geef_reference_to_id(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 ERL_NIF_TERM geef_reference_glob(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 ERL_NIF_TERM geef_reference_lookup(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
-ERL_NIF_TERM geef_reference_resolve(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
-ERL_NIF_TERM geef_reference_target(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
-ERL_NIF_TERM geef_reference_type(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
-ERL_NIF_TERM geef_reference_name(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+ERL_NIF_TERM geef_reference_lookup_resolved(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 ERL_NIF_TERM geef_reference_create(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 ERL_NIF_TERM geef_reference_dwim(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 

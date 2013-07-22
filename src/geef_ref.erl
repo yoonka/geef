@@ -1,44 +1,40 @@
 -module(geef_ref).
 
--export([lookup/2, resolve/1, create/4, dwim/2, shorthand/1]).
+-export([lookup/2, resolve/2, create/4, dwim/2, shorthand/1]).
 
 -include("geef_records.hrl").
 
--spec new(binary(), term()) -> geef_reference().
-new(Name, Handle) ->
-    Type = geef_nif:reference_type(Handle),
-    Bin = geef_nif:reference_target(Handle),
-    Target = case Type of
-		 symbolic ->
-		     Bin;
-		 oid ->
-		     #geef_oid{oid=Bin}
-	     end,
-    #geef_reference{handle=Handle, name=Name, type=Type, target=Target}.
+-spec new({binary(), oid | symbolic, binary()}) -> geef_reference().
+new({Name, oid, Target}) ->
+    #geef_reference{name = Name, type = oid, target = #geef_oid{oid = Target}};
+new({Name, symbolic, Target}) ->
+    #geef_reference{name = Name, type = symbolic, target = Target}.
 
 -spec create(pid(), iolist(), geef_oid() | binary(), boolean()) -> {ok, geef_reference()} | {error, term()}.
 create(Repo, Refname, Target, Force) ->
-    {ok, Ref} = geef_repo:create_reference(Repo, Refname, Target, Force),
-    {ok, new(Refname, Ref)}.
+    case geef_repo:create_reference(Repo, Refname, Target, Force) of
+        {ok, Spec} ->
+            {ok, new(Spec)};
+        Error ->
+            Error
+    end.
 
 -spec lookup(pid(), iolist()) -> {ok, geef_reference()} | {error, term()}.
 lookup(Repo, Refname) ->
-    Name = iolist_to_binary(Refname),
-    case geef_repo:lookup_reference(Repo, Name) of
-	{ok, Ref} ->
-	    {ok, new(Name, Ref)};
+    case geef_repo:lookup_reference(Repo, Refname) of
+	{ok, Spec} ->
+	    {ok, new(Spec)};
 	Other ->
 	    Other
     end.
 
--spec resolve(geef_reference()) -> {ok, geef_reference()} | {error, term()}.
-resolve(Ref = #geef_reference{type=oid}) ->
+-spec resolve(pid(), geef_reference()) -> {ok, geef_reference()} | {error, term()}.
+resolve(_Repo, Ref = #geef_reference{type=oid}) ->
     {ok, Ref}; % resolving an oid ref is a no-op, skip going into the NIF
-resolve(#geef_reference{handle=Handle}) ->
-    case geef_nif:reference_resolve(Handle) of
-	{ok, Ref} ->
-	    {ok, Name} = geef_nif:reference_name(Ref),
-	    {ok, new(Name, Ref)};
+resolve(Repo, #geef_reference{name=Name}) ->
+    case geef_repo:lookup_resolved(Repo, Name) of
+	{ok, Spec} ->
+	    {ok, new(Spec)};
 	Other ->
 	    Other
     end.
@@ -46,9 +42,8 @@ resolve(#geef_reference{handle=Handle}) ->
 -spec dwim(pid(), iolist()) -> {ok, geef_reference()} | {error, term()}.
 dwim(Repo, Name) ->
     case geef_repo:reference_dwim(Repo, Name) of
-	{ok, Handle} ->
-	    {ok, FullName} = geef_nif:reference_name(Handle),
-	    {ok, new(FullName, Handle)};
+	{ok, Spec} ->
+	    {ok, new(Spec)};
 	Err ->
 	    Err
     end.

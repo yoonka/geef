@@ -15,11 +15,13 @@ line(Text) ->
     Prefix = io_lib:format("~4.16.0b", [Len]),
     [Prefix, Text, "\n"].
 
--spec parse(iolist()) -> {{want | have, geef_oid()}, binary()} | {error, ebufs}.
+-spec parse(iolist()) -> {continue, term()} | {{want | have, geef_oid()}, term()} | pack.
 parse(In) ->
     case unpack(In) of
 	{error, ebufs} ->
 	    {continue, fun(More) -> parse([In, More]) end};
+        Res = {pack, _} ->
+            Res;
 	{Len, Bin} ->
 	    {Pkt, Rest} = parse_pkt(Bin, Len),
 	    {Pkt, fun(More) -> parse([Rest, More]) end}
@@ -45,9 +47,13 @@ service_path(<<"git-receive-pack ", Path/binary>>) ->
 
 -spec unpack(iolist()) -> {error, ebufs} | {non_neg_integer(), binary()}.
 unpack(In) ->
-    <<BLen:4/binary, Rest/binary>> = iolist_to_binary(In),
-    Len = erlang:list_to_integer(unicode:characters_to_list(BLen), 16),
-    do_unpack(Len, Rest).
+    case iolist_to_binary(In) of
+        Buf = <<"PACK", _/binary>> ->
+            {pack, Buf};
+        <<BLen:4/binary, Rest/binary>> ->
+            Len = erlang:list_to_integer(unicode:characters_to_list(BLen), 16),
+            do_unpack(Len, Rest)
+    end.
 
 do_unpack(0, Rest) ->
     {0, Rest};
