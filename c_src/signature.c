@@ -3,6 +3,93 @@
 #include <string.h>
 #include <git2.h>
 
+int geef_signature_from_erl(git_signature **out, ErlNifEnv *env, ERL_NIF_TERM *err, ERL_NIF_TERM term)
+{
+	const ERL_NIF_TERM *time_tuple, *time, *tuple;
+	ErlNifBinary name, email;
+	git_signature *sig;
+	git_time_t gtime;
+	int offset, arity;
+	unsigned int secs, megasecs;
+
+	memset(&name, 0, sizeof(ErlNifBinary));
+	memset(&email, 0, sizeof(ErlNifBinary));
+
+	if (!enif_get_tuple(env, term, &arity, &tuple))
+		goto on_badarg;
+
+	if (arity != 4)
+		goto on_badarg;
+
+	if (!enif_inspect_iolist_as_binary(env, tuple[1], &name))
+		goto on_badarg;
+
+	if (!enif_inspect_iolist_as_binary(env, tuple[2], &email))
+		goto on_badarg;
+
+	if (!geef_terminate_binary(&name))
+		goto on_oom;
+
+	if (!geef_terminate_binary(&email))
+		goto on_oom;
+
+	/*
+	 * Now that we have the name and e-mail, we need to extract
+	 * the time tuple. This is quite annoying as the time is yet
+	 * another tuple.
+	 */
+	if (!enif_get_tuple(env, term, &arity, &time_tuple))
+		goto on_badarg;
+
+	if (arity != 2)
+		goto on_badarg;
+
+	/*
+	 * The first element of the time is an erlang timestamp, which
+	 * separates megasecs out, for whatever reason
+	 */
+	if (!enif_get_tuple(env, term, &arity, &time))
+		goto on_badarg;
+
+	if (arity != 3)
+		goto on_badarg;
+
+	if (!enif_get_uint(env, time[0], &megasecs))
+		goto on_badarg;
+	if (!enif_get_uint(env, time[1], &secs))
+		goto on_badarg;
+
+	if (!enif_get_int(env, time[1], &offset))
+		goto on_badarg;
+
+	gtime = megasecs * 1000000 + secs;
+
+	/* Finally we have all the data */
+
+	if (git_signature_new(&sig, (char *)name.data, (char *)email.data, gtime, offset) < 0) {
+		enif_release_binary(&name);
+		enif_release_binary(&email);
+		*err = geef_error(env);
+		return -1;
+	}
+
+	*out = sig;
+	return 0;
+
+on_badarg:
+		enif_release_binary(&name);
+		enif_release_binary(&email);
+		*err = enif_make_badarg(env);
+		return -1;
+
+on_oom:
+		enif_release_binary(&name);
+		enif_release_binary(&email);
+		*err = geef_oom(env);
+		return -1;
+
+}
+
 static int geef_string_to_bin(ErlNifBinary *bin, const char *str)
 {
 	size_t len;

@@ -163,6 +163,7 @@ static ErlNifFunc geef_funcs[] =
 	{"object_id", 1, geef_object_id},
 	{"commit_tree", 1, geef_commit_tree},
 	{"commit_tree_id", 1, geef_commit_tree_id},
+	{"commit_create",  8, geef_commit_create},
 	{"tree_bypath", 2, geef_tree_bypath},
 	{"tree_nth",     2, geef_tree_nth},
 	{"tree_count",   1, geef_tree_count},
