@@ -37,6 +37,9 @@ defmodule Mix.Tasks.Compile.Nif do
   def run(_) do
     project = Mix.Project.get!
 
+    Mix.shell.info("* Running make...")
+    Mix.shell.info(:os.cmd('make'))
+
     if function_exported?(project, :nif, 0) do
       do_run(project.nif)
     else
