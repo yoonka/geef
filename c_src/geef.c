@@ -31,7 +31,7 @@ geef_atoms atoms;
 
 static int load(ErlNifEnv *env, void **priv, ERL_NIF_TERM load_info)
 {
-	git_threads_init();
+	git_libgit2_init();
 
 	geef_repository_type = enif_open_resource_type(env, NULL,
 						     "repository_type", geef_repository_free, ERL_NIF_RT_CREATE, NULL);
@@ -99,7 +99,7 @@ int upgrade(ErlNifEnv* env, void** priv_data, void** old_priv_data, ERL_NIF_TERM
 
 static void unload(ErlNifEnv* env, void* priv_data)
 {
-	git_threads_shutdown();
+	git_libgit2_shutdown();
 }
 
 ERL_NIF_TERM
