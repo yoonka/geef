@@ -14,7 +14,7 @@ defmodule Geef.Signature do
     %Geef.Signature{name: name, email: email, time: time}
   end
 
-	def to_record(%Geef.Signature{name: name, email: email, time: time}) do
+  def to_record(%Geef.Signature{name: name, email: email, time: time}) do
     {:geef_signature, name, email, time}
   end
 

@@ -71,13 +71,13 @@ defimpl Enumerable, for: Geef.Tree do
   alias Geef.TreeError
 
   def count(tree) do
-    Tree.count(tree)
+    {:ok, Tree.count(tree)}
   end
 
   def member?(tree, key) do
     case Tree.get(tree, key) do
-      {:ok, _} -> true
-      _ -> false
+      {:ok, _} -> {:ok, true}
+      _ -> {:ok, false}
     end
   end
 
